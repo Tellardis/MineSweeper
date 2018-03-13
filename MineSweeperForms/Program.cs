@@ -25,6 +25,7 @@ namespace MinerByAlexForms
             presenter.ConnectGame(new ConfigItem(vgame.NormalConfig, "Средний"));
             presenter.ConnectGame(new ConfigItem(vgame.HardConfig, "Тяжелый"));
             presenter.ConnectGame(new ConfigItem(vgame.AbsoluteConfig, "Абсолютный"));
+            //TestCommnet
             presenter.SetView(new MainForm());
             presenter.StartGame();
         }
