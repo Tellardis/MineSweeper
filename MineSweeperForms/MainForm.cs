@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MinerByAlex.Core;
+using System.Linq;
 
 namespace MinerByAlexForms
 {
@@ -16,14 +17,12 @@ namespace MinerByAlexForms
         private bool gameOver = false;
         private List<MineButton> _buttons;
         #endregion
-
         #region CTOR
         public MainForm()
         {
             InitializeComponent();
         }
         #endregion
-
         #region IMinerViewImplementation
         public void StartGame()
         {
@@ -55,26 +54,21 @@ namespace MinerByAlexForms
             MaximumSize = Size;
             MinimumSize = Size;
         }
-
         public void GameOver()
         {
             _presenter.ExplodeAllMines();
-            MessageBox.Show("GameOver");
             gameOver = true;
         }
-
         public void Victory()
         {
             _presenter.MarkAllMines();
-            MessageBox.Show("Victory");
+            MessageBox.Show("Победа");
             gameOver = true;
         }
-
         public void SetPresenter(MinerPresenter minerPresenter)
         {
             _presenter = minerPresenter;
         }
-
         public void FillNearMineCount()
         {
             foreach (var item in _buttons)
@@ -114,13 +108,62 @@ namespace MinerByAlexForms
             flp_field.ResumeLayout();
         }
         #endregion
-
-        #region FormEvents
-        private void button2_Click(object sender, EventArgs e)
+        #region Methods
+        private IEnumerable<MineButton> GetNearButtons(MineButton btn)
         {
-            new CustomSettings((x, y, count) => { _currentConfig = _presenter.NewCustomGame(_currentConfig, x, y, count); }).ShowDialog();
-            comboBox1.Text = "Пользовательская";
+            var fromX = btn.PosX - 1;
+            var toX = btn.PosX + 1;
+            var fromY = btn.PosY - 1;
+            var toY = btn.PosY + 1;
+            return _buttons.Where(x => x.PosX >= fromX && x.PosX <= toX && x.PosY >= fromY && x.PosY <= toY);
         }
+        private void HighlightNearCells(MineButton btn)
+        {
+            var near = GetNearButtons(btn);
+            var mam = near.Count(x => x.State == MineButtonState.MarkAsMine);
+            foreach (var item in near)
+                if (item.State != MineButtonState.Deactivated && item.State != MineButtonState.MarkAsMine)
+                {
+                    if (item.State == MineButtonState.UnMarked)
+                        item.Text = (btn.NearMinesCount - mam).ToString();
+                    item.FlatStyle = FlatStyle.Flat;
+                }
+            MouseEventHandler handle = (s, a) => { };
+            handle = (s, a) =>
+            {
+                foreach (var item in near)
+                    if (item.State != MineButtonState.Deactivated)
+                    {
+                        item.FlatStyle = FlatStyle.Standard;
+                        if (item.State == MineButtonState.UnMarked)
+                            item.Text = "";
+                    }
+
+                btn.MouseUp -= handle;
+            };
+            btn.MouseUp += handle;
+        }
+        private void RightButtonClick(MineButton btn)
+        {
+            switch (btn.State)
+            {
+                case MineButtonState.UnMarked:
+                    _presenter.MarkMine(btn.PosX, btn.PosY, MineButtonState.MarkAsMine);
+                    break;
+                case MineButtonState.Suspicious:
+                    _presenter.MarkMine(btn.PosX, btn.PosY, MineButtonState.UnMarked);
+                    break;
+                case MineButtonState.MarkAsMine:
+                    _presenter.MarkMine(btn.PosX, btn.PosY, MineButtonState.Suspicious);
+                    break;
+                case MineButtonState.Deactivated:
+                    _presenter.FastOpenCells(btn.PosX, btn.PosY);
+                    HighlightNearCells(btn);
+                    break;
+            }
+        }
+        #endregion
+        #region FormEvents
         private void MainForm_Load(object sender, EventArgs e)
         {
             comboBox1.Items.AddRange(_presenter.ConfigItems);
@@ -141,37 +184,20 @@ namespace MinerByAlexForms
                     break;
             }
         }
-
-        private void RightButtonClick(MineButton btn)
-        {
-            switch (btn.State)
-            {
-                case MineButtonState.UnMarked:
-                    _presenter.MarkMine(btn.PosX, btn.PosY, MineButtonState.MarkAsMine);
-                    break;
-                case MineButtonState.Suspicious:
-                    _presenter.MarkMine(btn.PosX, btn.PosY, MineButtonState.UnMarked);
-                    break;
-                case MineButtonState.MarkAsMine:
-                    _presenter.MarkMine(btn.PosX, btn.PosY, MineButtonState.Suspicious);
-                    break;
-                case MineButtonState.Deactivated:
-                    _presenter.FastOpenCells(btn.PosX, btn.PosY);
-                    break;
-            }
-        }
-
         private void button1_Click(object sender, EventArgs e)
         {
             _presenter.NewGame(_currentConfig);
         }
-
+        private void button2_Click(object sender, EventArgs e)
+        {
+            new CustomSettings((x, y, count) => { _currentConfig = _presenter.NewCustomGame(_currentConfig, x, y, count); }).ShowDialog();
+            comboBox1.Text = "Пользовательская";
+        }
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
             _currentConfig = ((ConfigItem)comboBox1.SelectedItem).FieldConfig;
         }
         #endregion
-
         #region CheatCodes
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
